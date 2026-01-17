@@ -1,6 +1,5 @@
-
-// Default peaceful nature sound (Updated to user requested ShanCha.ogg)
-export const DEFAULT_AUDIO_URL = "ShanCha.ogg";
+// 使用 jsDelivr CDN 加载音频，确保全球访问稳定性
+export const DEFAULT_AUDIO_URL = "https://cdn.jsdelivr.net/gh/DracoXia/XiaoyuAnd/ShanCha.ogg";
 
 export const TEXT_CONTENT = {
   landing: "推门，见山色",
@@ -33,7 +32,7 @@ export const TEXT_CONTENT = {
         list: [
           { name: "白花银针", desc: "毫香蜜韵 · 茶骨" },
           { name: "山茶花", desc: "清雅幽寒 · 去燥" },
-          { name: "白兰花", desc: "灵动鲜活 · 提神" },
+          { name: "白兰花", desc: "灵动鲜活 ·提神" },
           { name: "雪松", desc: "沉稳苍古 · 定心" }
         ]
       },
@@ -67,6 +66,5 @@ export const TEXT_CONTENT = {
   }
 };
 
-// 1 minute in milliseconds for testing
-export const IMMERSION_DURATION = 1 * 60 * 1000; 
-// export const IMMERSION_DURATION = 5000; // Debug mode: 5 seconds
+// 1 minute in milliseconds for immersion time
+export const IMMERSION_DURATION = 1 * 60 * 1000;
