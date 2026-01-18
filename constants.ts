@@ -1,5 +1,5 @@
-// 使用 jsDelivr CDN 加载音频，确保全球访问稳定性
-export const DEFAULT_AUDIO_URL = "https://cdn.jsdelivr.net/gh/DracoXia/XiaoyuAnd/ShanCha.ogg";
+// 使用 Gitee 仓库加载音频，确保资源的一致性
+export const DEFAULT_AUDIO_URL = "https://gitee.com/wx_4c58684d00/c_137-studio/raw/master/ShanCha.mp3";
 export const TRANSITION_AUDIO_URL = "https://cdn.jsdelivr.net/gh/DracoXia/XiaoyuAnd/female-sigh-450446.mp3";
 
 export const TEXT_CONTENT = {
