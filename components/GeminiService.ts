@@ -2,9 +2,20 @@
 import { GoogleGenAI } from "@google/genai";
 import { AI_PROMPTS } from "../constants";
 
-// Initialize Gemini Client
-// In a real production app, consider using a backend proxy to hide the API KEY
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization singleton
+let aiInstance: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!aiInstance) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      console.warn("API Key is missing! AI features will function in fallback mode.");
+      // 我们不在这里抛出错误，而是允许它失败，以便 UI 仍能渲染
+    }
+    aiInstance = new GoogleGenAI({ apiKey: apiKey || "dummy-key-to-prevent-crash" });
+  }
+  return aiInstance;
+};
 
 export interface TreeholeResult {
   reply: string;
@@ -15,6 +26,7 @@ export interface TreeholeResult {
 export const GeminiService = {
   async getDailySign(): Promise<string> {
     try {
+      const ai = getAI();
       const hour = new Date().getHours();
       const timeOfDay = hour < 12 ? "早晨" : hour < 18 ? "午后" : "夜晚";
       
@@ -32,6 +44,7 @@ export const GeminiService = {
 
   async getTreeHoleReply(mood: string, context: string, text: string): Promise<TreeholeResult> {
     try {
+      const ai = getAI();
       const response = await ai.models.generateContent({
         model: 'gemini-2.0-flash-lite-preview-02-05',
         contents: AI_PROMPTS.treehole(mood, context, text),

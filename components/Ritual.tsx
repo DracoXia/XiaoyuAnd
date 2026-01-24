@@ -19,6 +19,8 @@ const Ritual: React.FC<RitualProps> = ({ onComplete, onPrimeAudio }) => {
   
   // Use a ref for fillLevel to access inside event handlers without dependencies
   const fillLevelRef = useRef(0);
+  // Track if we have already primed the main audio to prevent duplicate calls
+  const hasPrimedMainAudio = useRef(false);
 
   useEffect(() => {
     audioRef.current = new Audio(POUR_AUDIO_URL);
@@ -37,7 +39,7 @@ const Ritual: React.FC<RitualProps> = ({ onComplete, onPrimeAudio }) => {
   const handleStart = (y: number) => {
       if (isCompleted) return;
       
-      // Unlock Audio Context on first interaction
+      // 1. Unlock Pouring Audio
       if (!audioUnlocked.current && audioRef.current) {
           const playPromise = audioRef.current.play();
           if (playPromise !== undefined) {
@@ -46,6 +48,13 @@ const Ritual: React.FC<RitualProps> = ({ onComplete, onPrimeAudio }) => {
                   audioUnlocked.current = true;
               }).catch(e => console.log("Audio silent unlock failed", e));
           }
+      }
+
+      // 2. CRITICAL FIX: Prime Main Background Audio immediately on touch
+      // This ensures we satisfy browser Autoplay Policy right at the start of interaction
+      if (onPrimeAudio && !hasPrimedMainAudio.current) {
+          onPrimeAudio();
+          hasPrimedMainAudio.current = true;
       }
 
       isDragging.current = true;
@@ -72,7 +81,6 @@ const Ritual: React.FC<RitualProps> = ({ onComplete, onPrimeAudio }) => {
              if (playPromise !== undefined) {
                  playPromise.catch(error => {
                      // Ignore AbortError which happens if we pause too quickly
-                     // console.warn("Playback prevented", error);
                  });
              }
           }
@@ -119,11 +127,6 @@ const Ritual: React.FC<RitualProps> = ({ onComplete, onPrimeAudio }) => {
       // Haptic feedback
       if (navigator.vibrate) try { navigator.vibrate([20, 30, 20]); } catch(e) {}
 
-      // PRIME AUDIO HERE: Trigger background music while we still have user interaction
-      if (onPrimeAudio) {
-          onPrimeAudio();
-      }
-      
       // Wait for visual transition
       setTimeout(onComplete, 1200);
   };

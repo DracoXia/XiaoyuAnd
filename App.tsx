@@ -17,6 +17,9 @@ const App: React.FC = () => {
   const [volume, setVolume] = useState(1);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   
+  // Ref to track volume in closures (fixes stale closure bug in timers)
+  const volumeRef = useRef(1);
+
   // AI States
   const [dailySign, setDailySign] = useState<string>("");
   
@@ -35,6 +38,11 @@ const App: React.FC = () => {
 
   const timerRef = useRef<number | null>(null);
 
+  // Sync ref with state
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
   // Pre-fetch Sign when entering Ritual
   useEffect(() => {
     if (phase === AppPhase.RITUAL) {
@@ -49,9 +57,9 @@ const App: React.FC = () => {
     }
   }, [phase]);
 
-  // Triggered instantly when user pours tea to 100% (User Interaction Context)
+  // Triggered instantly when user TOUCHES the screen in Ritual (User Interaction Context)
   const primeAudio = () => {
-      // Start playing silently
+      // Start playing silently immediately to unlock audio context
       setVolume(0);
       setIsPlaying(true);
   };
@@ -93,8 +101,9 @@ const App: React.FC = () => {
         timerRef.current = null;
     }
 
-    // Fade out audio
-    let currentVol = volume;
+    // Fade out audio using REF to avoid stale closure (volume was 0 when this function was created 10m ago)
+    let currentVol = volumeRef.current;
+    
     const fadeInterval = setInterval(() => {
       currentVol -= 0.05;
       if (currentVol <= 0) {
@@ -106,7 +115,11 @@ const App: React.FC = () => {
     }, 100); 
 
     setShowSafetyModal(false);
-    setPhase(AppPhase.TREEHOLE);
+    
+    // Delay phase change slightly to allow fade to start perceiving
+    setTimeout(() => {
+        setPhase(AppPhase.TREEHOLE);
+    }, 1500);
   };
 
   // Called when user manually clicks Heart to record mood
