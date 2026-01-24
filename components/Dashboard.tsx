@@ -1,6 +1,11 @@
 
+
+
+
+
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Leaf, Flame, Moon, Snowflake, ArrowRight, Heart, Sparkles, Lock, X, Calendar, TrendingUp, Archive, ScanLine, CheckCircle2, Info, ChevronRight } from 'lucide-react';
+import { Leaf, Flame, Moon, Snowflake, ArrowRight, Heart, Sparkles, Lock, X, Calendar, TrendingUp, Archive, ScanLine, CheckCircle2, Info, ChevronRight, Quote, ChevronDown, ChevronUp } from 'lucide-react';
 import { DASHBOARD_DATA, MOOD_OPTIONS, CONTEXT_OPTIONS, FRAGRANCE_LIST, TEXT_CONTENT } from '../constants';
 
 interface DashboardProps {
@@ -26,6 +31,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onScenarioClick }) => {
     // Fragrance Box State
     const [showFragranceBox, setShowFragranceBox] = useState(false);
     const [showFragranceDetail, setShowFragranceDetail] = useState(false); // To toggle product detail view
+    const [showStory, setShowStory] = useState(false); // To toggle perfumer story
 
     useEffect(() => {
         const hour = new Date().getHours();
@@ -98,6 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onScenarioClick }) => {
         e.stopPropagation();
         setShowFragranceBox(true);
         setShowFragranceDetail(false); // Reset to list view
+        setShowStory(false);
     };
 
     const handleScanClick = (fragranceName: string) => {
@@ -369,42 +376,111 @@ const Dashboard: React.FC<DashboardProps> = ({ onScenarioClick }) => {
                         className="fixed inset-0 bg-ink-gray/30 backdrop-blur-sm z-[80] animate-fade-in"
                         onClick={() => setShowFragranceBox(false)}
                     />
-                    {/* Added 'no-scrollbar' class to the drawer container */}
-                    <div className="fixed bottom-0 left-0 right-0 z-[90] bg-surface-white/95 backdrop-blur-2xl rounded-t-[3rem] shadow-[0_-30px_80px_rgba(0,0,0,0.15)] pt-8 pb-12 px-6 transform animate-slide-up transition-transform duration-300 border-t border-white/60 max-h-[85vh] overflow-y-auto min-h-[50vh] no-scrollbar">
-                         <div className="flex justify-center mb-6">
+                    {/* Drawer Container */}
+                    <div className="fixed bottom-0 left-0 right-0 z-[90] bg-surface-white/95 backdrop-blur-2xl rounded-t-[3rem] shadow-[0_-30px_80px_rgba(0,0,0,0.15)] pt-8 transform animate-slide-up transition-transform duration-300 border-t border-white/60 h-[85vh] flex flex-col">
+                         
+                         {/* Drawer Handle */}
+                         <div className="flex justify-center mb-2 shrink-0">
                             <div className="w-12 h-1.5 bg-gray-200 rounded-full opacity-50"></div>
                          </div>
                          
-                         {showFragranceDetail ? (
-                             // --- VIEW: Product Details ---
-                             <div className="animate-fade-in">
-                                 <div className="flex items-center gap-2 mb-6 cursor-pointer opacity-70 hover:opacity-100" onClick={() => setShowFragranceDetail(false)}>
-                                    <div className="p-1 rounded-full bg-gray-100"><ArrowRight className="w-4 h-4 text-ink-gray rotate-180" /></div>
-                                    <span className="text-sm font-bold text-ink-gray">返回香匣</span>
+                         {showStory ? (
+                             // --- VIEW: Perfumer Story (Deep Dive) ---
+                             <div className="animate-fade-in flex flex-col h-full overflow-hidden relative">
+                                 {/* Scrollable Story Content */}
+                                 <div className="flex-1 overflow-y-auto no-scrollbar p-6 pb-24">
+                                     {/* Top Nav: Back to Details */}
+                                     <div className="flex items-center gap-2 mb-6 cursor-pointer opacity-70 hover:opacity-100" onClick={() => setShowStory(false)}>
+                                        <div className="p-1 rounded-full bg-gray-100"><ArrowRight className="w-4 h-4 text-ink-gray rotate-180" /></div>
+                                        <span className="text-sm font-bold text-ink-gray">返回详情</span>
+                                     </div>
+                                     
+                                     <div className="bg-orange-50/50 p-6 rounded-[2rem] border border-orange-100/50 mb-10 animate-fade-in">
+                                        <div className="flex flex-col items-center mb-6">
+                                            <Quote className="w-8 h-8 text-dopamine-orange opacity-30 mb-2 fill-current" />
+                                            <h3 className="text-xl font-bold text-ink-gray">{TEXT_CONTENT.product.modal.story.title}</h3>
+                                            <p className="text-xs text-ink-light tracking-widest mt-1 uppercase">{TEXT_CONTENT.product.modal.story.subtitle}</p>
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            {TEXT_CONTENT.product.modal.story.content.map((paragraph, idx) => (
+                                                <p key={idx} className="font-serif text-ink-gray leading-loose text-justify text-base opacity-90">
+                                                    {paragraph}
+                                                </p>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-8 flex justify-center">
+                                            <img src="https://api.dicebear.com/9.x/micah/svg?seed=perfumer" alt="Perfumer" className="w-10 h-10 rounded-full bg-white p-1 border border-orange-100 shadow-sm opacity-80" />
+                                        </div>
+                                     </div>
                                  </div>
 
-                                 <h3 className="text-center font-bold text-2xl text-ink-gray mb-8 flex items-center justify-center gap-2">
-                                     <Leaf className="w-6 h-6 text-dopamine-green" />
-                                     {TEXT_CONTENT.product.modal.title}
-                                 </h3>
-                                 <p className="font-medium text-base text-ink-gray leading-loose mb-10 text-justify opacity-80">
-                                     {TEXT_CONTENT.product.modal.origin.part1} <b className="text-dopamine-green bg-green-50 px-1 rounded">{TEXT_CONTENT.product.modal.origin.highlight}</b> {TEXT_CONTENT.product.modal.origin.part2}
-                                 </p>
-                                 <div className="space-y-4 mb-10">
-                                     {TEXT_CONTENT.product.modal.ingredients.list.map((item, idx) => (
-                                         <div key={idx} className="flex justify-between items-center bg-gray-50/80 p-5 rounded-2xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100">
-                                             <span className="text-base font-bold text-ink-gray">{item.name}</span>
-                                             <span className="text-xs font-medium text-ink-light tracking-wide bg-white px-2 py-1 rounded-md shadow-sm">{item.desc}</span>
-                                         </div>
-                                     ))}
+                                 {/* Return Handle (Up Arrow) - Fixed Bottom */}
+                                 <div 
+                                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/90 to-transparent pt-10 pb-8 flex justify-center cursor-pointer z-10"
+                                    onClick={() => setShowStory(false)}
+                                 >
+                                     <div className="flex flex-col items-center gap-1 opacity-60 hover:opacity-100 transition-opacity animate-bounce-gentle">
+                                         <ChevronUp className="w-5 h-5 text-ink-gray" />
+                                         <span className="text-[10px] text-ink-light tracking-widest uppercase">收起故事</span>
+                                     </div>
                                  </div>
-                                 <p className="text-[11px] text-center text-ink-light font-medium tracking-wide opacity-50">
-                                     {TEXT_CONTENT.product.modal.footer}
-                                 </p>
+                             </div>
+                         ) : showFragranceDetail ? (
+                             // --- VIEW: Product Details ---
+                             <div className="animate-fade-in flex flex-col h-full relative">
+                                 {/* Scrollable Ingredients Area */}
+                                 <div className="flex-1 overflow-y-auto no-scrollbar p-6 pb-32">
+                                     <div className="flex items-center gap-2 mb-6 cursor-pointer opacity-70 hover:opacity-100" onClick={() => setShowFragranceDetail(false)}>
+                                        <div className="p-1 rounded-full bg-gray-100"><ArrowRight className="w-4 h-4 text-ink-gray rotate-180" /></div>
+                                        <span className="text-sm font-bold text-ink-gray">返回香匣</span>
+                                     </div>
+
+                                     <h3 className="text-center font-bold text-2xl text-ink-gray mb-8 flex items-center justify-center gap-2">
+                                         <Leaf className="w-6 h-6 text-dopamine-green" />
+                                         {TEXT_CONTENT.product.modal.title}
+                                     </h3>
+                                     <p className="font-medium text-base text-ink-gray leading-loose mb-10 text-justify opacity-80">
+                                         {TEXT_CONTENT.product.modal.origin.part1} <b className="text-dopamine-green bg-green-50 px-1 rounded">{TEXT_CONTENT.product.modal.origin.highlight}</b> {TEXT_CONTENT.product.modal.origin.part2}
+                                     </p>
+                                     <div className="space-y-4 mb-12">
+                                         {TEXT_CONTENT.product.modal.ingredients.list.map((item, idx) => (
+                                             <div key={idx} className="flex justify-between items-center bg-gray-50/80 p-5 rounded-2xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-gray-100">
+                                                 <span className="text-base font-bold text-ink-gray">{item.name}</span>
+                                                 <span className="text-xs font-medium text-ink-light tracking-wide bg-white px-2 py-1 rounded-md shadow-sm">{item.desc}</span>
+                                             </div>
+                                         ))}
+                                     </div>
+                                     
+                                     {/* Safety Warning (Moved into scroll flow) */}
+                                     <p className="text-[11px] text-center text-ink-light font-medium tracking-wide opacity-40 mb-4">
+                                         {TEXT_CONTENT.product.modal.footer}
+                                     </p>
+                                 </div>
+
+                                 {/* FIXED BOTTOM BAR: Perfumer Story Trigger */}
+                                 <div 
+                                    onClick={() => setShowStory(true)}
+                                    className="absolute bottom-0 left-0 right-0 bg-orange-50/90 backdrop-blur-md border-t border-orange-100/50 py-4 px-6 cursor-pointer hover:bg-orange-100/90 transition-colors z-20 group"
+                                 >
+                                     <div className="flex items-center justify-between">
+                                         <div className="flex items-center gap-3">
+                                             <div className="bg-white p-2 rounded-xl shadow-sm text-dopamine-orange group-hover:scale-110 transition-transform">
+                                                 <Quote className="w-4 h-4" strokeWidth={2.5} />
+                                             </div>
+                                             <div className="flex flex-col">
+                                                 <span className="font-bold text-ink-gray text-sm group-hover:text-dopamine-orange transition-colors">制香师说</span>
+                                                 <span className="text-[10px] text-ink-light opacity-70 tracking-wide">午后暖阳与一杯茶</span>
+                                             </div>
+                                         </div>
+                                         <ChevronDown className="w-5 h-5 text-ink-light group-hover:translate-y-1 transition-transform" />
+                                     </div>
+                                 </div>
                              </div>
                          ) : (
                              // --- VIEW: List of Fragrances ---
-                             <div className="animate-fade-in">
+                             <div className="animate-fade-in flex-1 overflow-y-auto no-scrollbar p-6">
                                  <div className="flex justify-between items-start mb-8">
                                      <div>
                                          <h3 className="text-2xl font-bold text-ink-gray mb-1 flex items-center gap-2">
@@ -413,11 +489,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onScenarioClick }) => {
                                          </h3>
                                          <p className="text-xs text-ink-light">今日，燃哪一支？</p>
                                      </div>
-                                     
-                                     {/* Removed Global "About Fragrance" Button */}
                                  </div>
 
-                                 <div className="space-y-4">
+                                 <div className="space-y-4 pb-12">
                                     {FRAGRANCE_LIST.map((fragrance) => (
                                         <div 
                                             key={fragrance.id}

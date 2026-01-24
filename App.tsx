@@ -1,6 +1,10 @@
 
+
+
+
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, X, Leaf, Loader2, AlertCircle, ChevronRight, Send, Check, Users, ArrowLeft, Heart, Sparkles, Quote, Sun, CloudRain, Wind } from 'lucide-react';
+import { Volume2, VolumeX, X, Leaf, Loader2, AlertCircle, ChevronRight, Send, Check, Users, ArrowLeft, Heart, Sparkles, Quote, Sun, CloudRain, Wind, MessageCircleHeart } from 'lucide-react';
 import { AppPhase } from './types';
 import { TEXT_CONTENT, DEFAULT_AUDIO_URL, TRANSITION_AUDIO_URL, IMMERSION_DURATION, MOOD_OPTIONS, CONTEXT_OPTIONS, AMBIANCE_MODES, FRAGRANCE_LIST } from './constants';
 import DynamicBackground from './components/DynamicBackground';
@@ -298,52 +302,54 @@ const App: React.FC = () => {
 
   const renderTreehole = () => {
     return (
-      <div className="fixed inset-0 z-50 bg-black/5 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-fade-in font-sans">
+      <div className="fixed inset-0 z-50 bg-black/5 backdrop-blur-sm flex flex-col items-center justify-center p-0 animate-fade-in font-sans">
           
-          {/* Main Card Container with Glassmorphism */}
-          <div className="bg-white/80 backdrop-blur-xl w-full max-w-sm rounded-[2.5rem] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.15)] flex flex-col relative transition-all duration-500 overflow-hidden min-h-[65vh] border border-white/60">
+          {/* Main Card Container - Full Screen/Modal Hybrid */}
+          {/* REMOVED: max-w-sm, height restrictions */}
+          <div className={`w-full h-full md:h-auto md:max-w-md md:rounded-[3rem] bg-[#F5F5F7]/95 backdrop-blur-2xl transition-all duration-500 overflow-hidden flex flex-col relative ${aiResult ? '' : 'justify-center'}`}>
               
-              {/* Soft Color Splash Top */}
-              <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-dopamine-orange/20 rounded-full blur-3xl pointer-events-none" />
-              <div className="absolute bottom-[-50px] left-[-50px] w-40 h-40 bg-dopamine-blue/20 rounded-full blur-3xl pointer-events-none" />
+              {/* Soft Color Splash Top - Aesthetic Background */}
+              <div className="absolute top-[-100px] right-[-50px] w-64 h-64 bg-dopamine-orange/20 rounded-full blur-[80px] pointer-events-none mix-blend-multiply" />
+              <div className="absolute bottom-[-100px] left-[-50px] w-64 h-64 bg-dopamine-blue/20 rounded-full blur-[80px] pointer-events-none mix-blend-multiply" />
+              <div className="absolute top-[40%] left-[50%] transform -translate-x-1/2 w-80 h-80 bg-white/40 rounded-full blur-[100px] pointer-events-none" />
 
-              {/* Progress Bar */}
+              {/* Progress Bar (Only during input phases) */}
               {!aiResult && (
-                  <div className="flex justify-center space-x-2 mt-8 mb-4 relative z-10">
+                  <div className="absolute top-12 left-0 right-0 flex justify-center space-x-2 z-10">
                       {[0, 1, 2].map(step => (
-                          <div key={step} className={`h-1.5 rounded-full transition-all duration-500 ease-spring ${treeholeStep >= step ? 'w-8 bg-dopamine-orange' : 'w-2 bg-gray-200'}`} />
+                          <div key={step} className={`h-1 rounded-full transition-all duration-500 ease-spring ${treeholeStep >= step ? 'w-8 bg-dopamine-orange' : 'w-2 bg-gray-300/50'}`} />
                       ))}
                   </div>
               )}
 
               {/* Content Area */}
-              <div className="flex-1 flex flex-col px-8 pb-8 relative z-10 overflow-y-auto no-scrollbar">
+              <div className={`flex-1 flex flex-col relative z-20 overflow-y-auto no-scrollbar ${aiResult ? 'pt-10 px-6 pb-32' : 'px-8 pb-8 justify-center'}`}>
                   
                   {/* Step 0: Mood Selection */}
                   {treeholeStep === 0 && (
-                      <div className="animate-fade-in flex flex-col h-full justify-center">
+                      <div className="animate-fade-in flex flex-col items-center">
                           {/* Back Button specifically for Manual Entry from Immersion */}
                           {isPlaying && (
-                            <button onClick={handleBackToImmersion} className="absolute top-0 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
+                            <button onClick={handleBackToImmersion} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                           )}
 
-                          <h3 className="text-center font-bold text-ink-gray text-2xl mb-2">此刻心情</h3>
-                          <p className="text-center text-ink-light text-sm mb-10 font-medium bg-white/50 w-fit mx-auto px-4 py-1 rounded-full backdrop-blur-sm">把心事交给小屿，没关系的</p>
+                          <h3 className="text-center font-bold text-ink-gray text-3xl mb-3 mt-10">此刻心情</h3>
+                          <p className="text-center text-ink-light text-sm mb-12 font-medium bg-white/60 px-5 py-2 rounded-full backdrop-blur-sm shadow-sm border border-white/40">把心事交给小屿，没关系的</p>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-5 w-full">
                               {MOOD_OPTIONS.map((mood) => (
                                   <button
                                       key={mood.id}
                                       onClick={() => handleMoodSelect(mood.label)}
                                       className={`
-                                        group relative p-4 rounded-3xl flex flex-col items-center justify-center space-y-2 transition-all duration-300 transform hover:scale-[1.05] active:scale-95 border border-transparent
-                                        ${selectedMood === mood.label ? mood.style + ' shadow-lg border-white/50' : 'bg-white/60 text-gray-400 hover:bg-white hover:shadow-md'}
+                                        group relative p-6 rounded-[2rem] flex flex-col items-center justify-center space-y-3 transition-all duration-300 transform active:scale-95 border
+                                        ${selectedMood === mood.label ? mood.style + ' shadow-xl scale-[1.02] border-white' : 'bg-white/70 text-gray-400 border-white/40 hover:bg-white hover:shadow-lg hover:shadow-gray-100/50'}
                                       `}
                                   >
-                                      <span className="text-4xl transition-transform duration-300 group-hover:-translate-y-1 drop-shadow-sm">{mood.icon}</span>
-                                      <span className="text-sm font-bold tracking-wide">{mood.label}</span>
+                                      <span className="text-5xl transition-transform duration-300 group-hover:-translate-y-2 drop-shadow-sm filter grayscale-[0.2] group-hover:grayscale-0">{mood.icon}</span>
+                                      <span className="text-base font-bold tracking-wide">{mood.label}</span>
                                   </button>
                               ))}
                           </div>
@@ -352,27 +358,30 @@ const App: React.FC = () => {
 
                   {/* Step 1: Context Selection */}
                   {treeholeStep === 1 && (
-                      <div className="animate-fade-in flex flex-col h-full justify-center">
-                           <button onClick={() => setTreeholeStep(0)} className="absolute top-0 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full">
+                      <div className="animate-fade-in flex flex-col items-center">
+                           <button onClick={() => setTreeholeStep(0)} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
                                 <ArrowLeft className="w-5 h-5" />
                            </button>
 
-                           <h3 className="text-center font-bold text-ink-gray text-2xl mb-2">因为什么呢？</h3>
-                           <p className="text-center text-ink-light text-sm mb-8 font-medium">找到源头，才能更好的抱抱你</p>
+                           <h3 className="text-center font-bold text-ink-gray text-3xl mb-3 mt-10">因为什么呢？</h3>
+                           <p className="text-center text-ink-light text-sm mb-10 font-medium">找到源头，才能更好的抱抱你</p>
                            
-                           <div className="flex items-center justify-center space-x-2 text-ink-light mb-10 opacity-90 bg-orange-50/80 py-2 px-5 rounded-full mx-auto w-fit border border-orange-100 shadow-sm">
-                                <Users className="w-3.5 h-3.5 text-dopamine-orange" />
-                                <span className="text-xs font-bold text-dopamine-orange">
+                           {/* Social Proof Badge */}
+                           <div className="flex items-center space-x-2 mb-10 bg-white/80 backdrop-blur-sm py-2 px-4 rounded-full shadow-sm border border-white/60">
+                                <div className="flex -space-x-1.5">
+                                    {[1,2,3].map(i => <div key={i} className="w-5 h-5 rounded-full bg-gray-200 border-2 border-white" />)}
+                                </div>
+                                <span className="text-xs font-bold text-ink-light">
                                     {Math.floor(residentCount / 3)} 人此刻与你共鸣
                                 </span>
                            </div>
 
-                           <div className="flex flex-wrap justify-center gap-3">
+                           <div className="flex flex-wrap justify-center gap-3 w-full">
                                {CONTEXT_OPTIONS.map((ctx) => (
                                    <button
                                        key={ctx}
                                        onClick={() => handleContextSelect(ctx)}
-                                       className={`px-6 py-3.5 rounded-2xl text-sm font-bold border-2 transition-all duration-300 hover:-translate-y-1 active:scale-95 ${selectedContext === ctx ? 'bg-ink-gray text-white border-ink-gray shadow-xl shadow-gray-200' : 'border-transparent text-ink-light bg-white/80 hover:bg-white hover:shadow-md'}`}
+                                       className={`px-6 py-4 rounded-2xl text-sm font-bold border transition-all duration-300 hover:-translate-y-1 active:scale-95 ${selectedContext === ctx ? 'bg-ink-gray text-white border-ink-gray shadow-xl shadow-gray-200' : 'border-white/50 text-ink-light bg-white/70 hover:bg-white hover:shadow-md'}`}
                                    >
                                        {ctx}
                                    </button>
@@ -383,79 +392,109 @@ const App: React.FC = () => {
 
                   {/* Step 2: Text Input & Result */}
                   {treeholeStep === 2 && (
-                      <div className="animate-fade-in h-full flex flex-col justify-center">
+                      <div className="animate-fade-in h-full flex flex-col">
                           {aiResult ? (
-                               <div className="flex flex-col items-center flex-1 h-full py-2 space-y-4">
+                               <div className="flex flex-col items-center w-full space-y-6 animate-fade-in">
                                     
-                                    {/* Main Healing Letter */}
-                                    <div className="bg-gradient-to-br from-orange-50 to-white border border-orange-100 p-6 rounded-[2rem] w-full relative shadow-lg shadow-orange-100/50 flex flex-col animate-fade-in">
-                                        <div className="absolute -top-3 left-6 bg-white p-1.5 rounded-2xl shadow-sm text-xl border border-gray-50">💌</div>
-                                        <h4 className="font-bold text-ink-gray text-sm mb-2 opacity-80">小屿的回信：</h4>
-                                        <p className="font-serif text-ink-gray text-base leading-relaxed text-justify relative z-10 font-medium">
+                                    {/* 1. Letter Card (Warm, Paper-like) */}
+                                    <div className="w-full bg-[#FFF9F0] p-8 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(255,160,0,0.15)] relative border border-[#F2E8D5] flex flex-col gap-4">
+                                        <div className="flex items-center gap-3 mb-2 opacity-80">
+                                            <div className="w-8 h-8 rounded-full bg-dopamine-orange/20 flex items-center justify-center text-dopamine-orange">
+                                                <MessageCircleHeart className="w-4 h-4" />
+                                            </div>
+                                            <span className="font-bold text-ink-gray text-sm tracking-wide">小屿的回信</span>
+                                        </div>
+                                        
+                                        <p className="font-serif text-ink-gray text-[17px] leading-8 text-justify opacity-90">
                                             {aiResult.reply}
                                         </p>
+
+                                        {/* Decorative Stamp/Signature */}
+                                        <div className="self-end mt-2 flex items-center gap-2 opacity-60">
+                                            <span className="font-serif text-xs italic text-ink-light">Yours, Xiaoyu</span>
+                                            <Leaf className="w-4 h-4 text-dopamine-green" />
+                                        </div>
                                     </div>
                                     
-                                    {/* Similar Story / Social Proof - Updated Design */}
-                                    <div className="bg-white/60 backdrop-blur-sm border border-white/60 p-5 rounded-[1.5rem] w-full relative animate-fade-in flex flex-col" style={{ animationDelay: '0.3s', animationFillMode: 'forwards' }}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Sparkles className="w-4 h-4 text-dopamine-blue" />
-                                            <h4 className="font-bold text-dopamine-blue text-xs tracking-wide">远方的回响</h4>
-                                        </div>
-                                        <div className="relative pl-3 border-l-2 border-dopamine-blue/20">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] font-bold text-dopamine-blue bg-dopamine-blue/10 px-2 py-0.5 rounded-md">
+                                    {/* 2. Echo Card (Modern, Glassy, Realistic) */}
+                                    <div className="w-full relative pl-4 mt-2">
+                                        {/* Vertical line connector */}
+                                        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-dopamine-blue/30 to-transparent"></div>
+                                        
+                                        <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 rounded-[2rem] shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Sparkles className="w-4 h-4 text-dopamine-blue" />
+                                                    <h4 className="font-bold text-ink-gray text-sm">远方的回响</h4>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-dopamine-blue bg-dopamine-blue/10 px-2 py-1 rounded-md">
                                                     @{aiResult.nickname}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-ink-light leading-relaxed italic text-justify">
+                                            
+                                            <p className="text-sm text-ink-gray leading-7 text-justify font-normal opacity-80">
                                                 "{aiResult.story}"
                                             </p>
+
+                                            {/* Reaction Bar (Mock) */}
+                                            <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100/50">
+                                                <div className="flex items-center gap-1 opacity-40 text-xs font-bold">
+                                                    <Heart className="w-3 h-3" /> 124
+                                                </div>
+                                                <div className="flex items-center gap-1 opacity-40 text-xs font-bold">
+                                                    <span className="text-[10px]">🫂</span> 抱抱
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex-1"></div>
+                                    <div className="h-8"></div> {/* Spacer */}
                                     
+                                    {/* Action Button */}
                                     <button 
                                         onClick={() => setPhase(AppPhase.DASHBOARD)}
-                                        className="w-full bg-ink-gray text-white py-3.5 rounded-2xl font-bold flex items-center justify-center space-x-2 hover:bg-black transition-all shadow-xl shadow-gray-300 hover:scale-[1.02] active:scale-95"
+                                        className="w-full bg-ink-gray text-white py-4 rounded-[1.5rem] font-bold text-lg flex items-center justify-center space-x-2 hover:bg-black transition-all shadow-xl shadow-gray-200 hover:scale-[1.02] active:scale-95 group"
                                     >
                                         <span>带着能量出发</span>
-                                        <ChevronRight className="w-4 h-4" />
+                                        <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </button>
                                </div>
                           ) : (
-                              <>
-                                  <button onClick={() => setTreeholeStep(1)} className="absolute top-0 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full">
+                              <div className="flex flex-col items-center justify-center min-h-[50vh]">
+                                  <button onClick={() => setTreeholeStep(1)} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
                                         <ArrowLeft className="w-5 h-5" />
                                   </button>
                                   
-                                  <div className="flex items-center space-x-2 mb-6 justify-center mt-2">
-                                      <span className="text-xs font-bold bg-dopamine-orange/10 text-dopamine-orange px-3 py-1 rounded-full border border-orange-100">{selectedMood}</span>
+                                  {/* FIXED: Overlapping UI. Changed to flex-wrap with gap. */}
+                                  <div className="flex flex-wrap items-center justify-center gap-3 mb-8 mt-10 w-full max-w-[80%]">
+                                      <span className="text-xs font-bold bg-white text-ink-gray px-4 py-1.5 rounded-full border border-gray-100 shadow-sm whitespace-nowrap">{selectedMood}</span>
                                       <span className="text-xs text-gray-300">+</span>
-                                      <span className="text-xs font-bold bg-white text-ink-gray px-3 py-1 rounded-full border border-gray-100">{selectedContext}</span>
+                                      <span className="text-xs font-bold bg-white text-ink-gray px-4 py-1.5 rounded-full border border-gray-100 shadow-sm whitespace-nowrap">{selectedContext}</span>
                                   </div>
                                   
-                                  <h3 className="text-center font-bold text-ink-gray text-xl mb-3">还有想说的吗？</h3>
-                                  <p className="text-center text-xs text-ink-light mb-4">（悄悄告诉小屿，风会带走烦恼）</p>
+                                  <h3 className="text-center font-bold text-ink-gray text-2xl mb-3">还有想说的吗？</h3>
+                                  <p className="text-center text-xs text-ink-light mb-8">（悄悄告诉小屿，风会带走烦恼）</p>
                                   
-                                  <textarea
-                                    value={userText}
-                                    onChange={(e) => setUserText(e.target.value)}
-                                    placeholder="可以不写哦，小屿懂你的..."
-                                    className="w-full bg-gray-50/50 border-0 focus:bg-white focus:ring-2 focus:ring-orange-100 rounded-3xl p-6 text-ink-gray focus:outline-none text-center resize-none h-32 placeholder:text-ink-light/40 placeholder:font-medium transition-all shadow-inner mb-4"
-                                  />
+                                  <div className="w-full relative">
+                                      <textarea
+                                        value={userText}
+                                        onChange={(e) => setUserText(e.target.value)}
+                                        placeholder="可以不写哦，小屿懂你的..."
+                                        className="w-full bg-white border-0 focus:ring-2 focus:ring-dopamine-orange/20 rounded-[2rem] p-8 text-ink-gray focus:outline-none text-center resize-none h-48 placeholder:text-ink-light/30 placeholder:font-medium transition-all shadow-sm text-lg leading-relaxed"
+                                      />
+                                      {/* Character count or decoration could go here */}
+                                  </div>
 
-                                  <div className="flex justify-center mt-4">
+                                  <div className="flex justify-center mt-10">
                                       <button 
                                         onClick={handleFinalSubmit}
                                         disabled={isGenerating}
-                                        className="w-20 h-20 rounded-full bg-gradient-to-tr from-dopamine-orange to-amber-400 text-white flex items-center justify-center hover:shadow-orange-200 transition-all disabled:opacity-50 shadow-xl hover:scale-110 active:scale-90 group"
+                                        className="w-20 h-20 rounded-full bg-ink-gray text-white flex items-center justify-center hover:shadow-xl hover:shadow-gray-300 transition-all disabled:opacity-80 shadow-lg hover:scale-110 active:scale-90 group"
                                       >
                                           {isGenerating ? <Loader2 className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8 ml-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                                       </button>
                                   </div>
-                              </>
+                              </div>
                           )}
                       </div>
                   )}
