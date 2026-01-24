@@ -1,12 +1,7 @@
-
-
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, X, Leaf, Loader2, AlertCircle, ChevronRight, Send, Check, Users, ArrowLeft, Heart, Sparkles, Quote, Sun, CloudRain, Wind, MessageCircleHeart } from 'lucide-react';
+import { Volume2, VolumeX, X, Leaf, Loader2, AlertCircle, ChevronRight, Send, Check, Users, ArrowLeft, Heart, Sparkles, Quote, Sun, CloudRain, Wind, MessageCircleHeart, AlignLeft, Feather, Plus } from 'lucide-react';
 import { AppPhase } from './types';
-import { TEXT_CONTENT, DEFAULT_AUDIO_URL, TRANSITION_AUDIO_URL, IMMERSION_DURATION, MOOD_OPTIONS, CONTEXT_OPTIONS, AMBIANCE_MODES, FRAGRANCE_LIST } from './constants';
+import { TEXT_CONTENT, DEFAULT_AUDIO_URL, TRANSITION_AUDIO_URL, IMMERSION_DURATION, MOOD_OPTIONS, CONTEXT_OPTIONS, AMBIANCE_MODES, FRAGRANCE_LIST, MOCK_ECHOES } from './constants';
 import DynamicBackground from './components/DynamicBackground';
 import AudioPlayer from './components/AudioPlayer';
 import Ritual from './components/Ritual';
@@ -39,14 +34,32 @@ const App: React.FC = () => {
   const [dailySign, setDailySign] = useState<string>("");
   
   // Treehole Multi-step State
-  const [treeholeStep, setTreeholeStep] = useState<0 | 1 | 2>(0); 
+  const [treeholeStep, setTreeholeStep] = useState<0 | 1>(0); 
   const [selectedMood, setSelectedMood] = useState<string>("");
   const [selectedContext, setSelectedContext] = useState<string>("");
-  const [userText, setUserText] = useState("");
+  
+  // User Medicine Input
+  const [healingText, setHealingText] = useState("");
+  const [isSubmittingMedicine, setIsSubmittingMedicine] = useState(false);
+  const [myMedicine, setMyMedicine] = useState<{content: string, date: string} | null>(null);
+
   
   // New structured result state
   const [aiResult, setAiResult] = useState<TreeholeResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Echo Waterfall State
+  const [echoes, setEchoes] = useState(MOCK_ECHOES);
+  
+  // --- Waterfall Connectivity Effect State ---
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Replaced activeCardId with a Set of visited IDs for persistent lighting
+  const [visitedCardIds, setVisitedCardIds] = useState<Set<string>>(new Set());
+  const [pathPoints, setPathPoints] = useState<{x: number, y: number}[]>([]);
+  
+  // Refs to store DOM elements for line calculation
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const dotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
   // Social Proof State
   const [residentCount, setResidentCount] = useState(0);
@@ -68,9 +81,55 @@ const App: React.FC = () => {
   // Generate random resident count once when entering Treehole
   useEffect(() => {
     if (phase === AppPhase.TREEHOLE && residentCount === 0) {
-        setResidentCount(Math.floor(Math.random() * (500 - 120 + 1)) + 120);
+        setResidentCount(Math.floor(Math.random() * (1500 - 800 + 1)) + 800);
     }
   }, [phase]);
+
+  // --- Waterfall Scroll Logic ---
+  useEffect(() => {
+      const container = scrollContainerRef.current;
+      if (!container || !aiResult) return; 
+
+      // REMOVED: The logic that automatically added cards to visitedCardIds on scroll.
+      // Now, connections are strictly based on User Actions (Clicking Heart) or Submission.
+      // We only keep the listener to trigger line re-draws if layout shifts (though usually not needed for pure scroll if SVG scrolls with content).
+      
+      const handleScroll = () => {
+          // Placeholder for any future scroll effects (e.g. parallax)
+          // Currently empty to fix the "slide lights up everything" bug.
+      };
+
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+  }, [aiResult, myMedicine]); 
+
+  // --- Calculate Line Path (The Flow) ---
+  useEffect(() => {
+      // Re-calculate the SVG path whenever visited cards change
+      if (!scrollContainerRef.current) return;
+
+      const container = scrollContainerRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const points: {x: number, y: number, id: string}[] = [];
+
+      visitedCardIds.forEach(id => {
+          const dotEl = dotRefs.current.get(id);
+          if (dotEl) {
+              const dotRect = dotEl.getBoundingClientRect();
+              // Calculate relative to scroll container content
+              const relX = dotRect.left - containerRect.left + (dotRect.width / 2);
+              const relY = dotRect.top - containerRect.top + (dotRect.height / 2) + container.scrollTop;
+              points.push({ x: relX, y: relY, id });
+          }
+      });
+
+      // Sort points by Y position so the line flows down (waterfall style)
+      // This ensures that even if I like the bottom card then top card, the line flows Top -> Bottom
+      points.sort((a, b) => a.y - b.y);
+
+      setPathPoints(points);
+
+  }, [visitedCardIds, aiResult, echoes]); // Recalc when visited set changes or UI updates
 
   const handleFragranceChange = (id: string) => {
       setActiveFragranceId(id);
@@ -82,8 +141,6 @@ const App: React.FC = () => {
   };
 
   // --- NEW: Handle Start of Interaction on Ritual Page ---
-  // This is the "Prime Audio" trick. We start playing at Volume 0 when user touches screen.
-  // This satisfies iOS/Android policy while keeping the experience silent until the right moment.
   const handleRitualInteractionStart = () => {
       if (!isPlaying) {
           setVolume(0); // Ensure silence
@@ -92,19 +149,13 @@ const App: React.FC = () => {
   };
 
   const handleRitualComplete = () => {
-    // 1. Play transition sound (Effect)
     const transitionAudio = new Audio(TRANSITION_AUDIO_URL);
     transitionAudio.volume = 0.9;
     transitionAudio.play().catch(console.warn);
 
-    // 2. Transition Phase Change
     setPhase(AppPhase.IMMERSION);
     setFadeRitual(true);
 
-    // 3. Start Background Music FADE IN
-    // Note: The audio is ALREADY playing (at volume 0) thanks to handleRitualInteractionStart
-    // We just need to fade it up now.
-    
     let currentVol = 0;
     const fadeInterval = setInterval(() => {
         currentVol += 0.05;
@@ -115,7 +166,6 @@ const App: React.FC = () => {
         setVolume(currentVol);
     }, 100);
 
-    // 4. Unmount Ritual layer after transition finishes
     setTimeout(() => {
         setShowRitualLayer(false);
     }, 3000); 
@@ -130,14 +180,12 @@ const App: React.FC = () => {
       }, IMMERSION_DURATION);
   };
 
-  // Called when timer ends naturally
   const handleSessionEnd = () => {
     if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
     }
 
-    // Fade out audio using REF to avoid stale closure (volume was 0 when this function was created 10m ago)
     let currentVol = volumeRef.current;
     
     const fadeInterval = setInterval(() => {
@@ -150,29 +198,17 @@ const App: React.FC = () => {
       setVolume(currentVol);
     }, 100); 
     
-    // Delay phase change slightly to allow fade to start perceiving
     setTimeout(() => {
         setPhase(AppPhase.TREEHOLE);
     }, 1500);
   };
 
-  // Called when user manually clicks Heart to record mood
   const handleManualMoodEntry = () => {
-      // Clear timer so it doesn't interrupt the user later, 
-      // but keep music playing as requested
       if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
       }
       setPhase(AppPhase.TREEHOLE);
-      // NOTE: We do NOT stop isPlaying here
-  };
-
-  const handleBackToImmersion = () => {
-      setPhase(AppPhase.IMMERSION);
-      // Optionally restart timer if we want to enforce the 10min rule again,
-      // or just let them chill indefinitely. Let's restart to be safe.
-      startImmersionTimer();
   };
 
   const handleMoodSelect = (moodLabel: string) => {
@@ -180,43 +216,101 @@ const App: React.FC = () => {
       setTimeout(() => setTreeholeStep(1), 300);
   };
 
-  const handleContextSelect = (ctx: string) => {
+  // Step 1: Context Selection -> Triggers AI immediately (Skipping Venting Input)
+  const handleContextSelect = async (ctx: string) => {
       setSelectedContext(ctx);
-      setTimeout(() => setTreeholeStep(2), 300);
-  };
-
-  const handleFinalSubmit = async () => {
       setIsGenerating(true);
-      const result = await GeminiService.getTreeHoleReply(selectedMood, selectedContext, userText);
+      // Generate result immediately
+      const result = await GeminiService.getTreeHoleReply(selectedMood, ctx);
       setAiResult(result);
       setIsGenerating(false);
   };
 
+  // Handle Healing Medicine Submission
+  const handleMedicineSubmit = async () => {
+      if (!healingText.trim()) return;
+      setIsSubmittingMedicine(true);
+      
+      const isValid = await GeminiService.validateHealingContent(healingText);
+      
+      if (isValid) {
+          // Success: Add to local state
+          const newId = 'my-new';
+          setMyMedicine({
+              content: healingText,
+              date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          
+          // Add to echoes list
+          setEchoes(prev => [{
+              id: newId,
+              content: healingText,
+              nickname: "我",
+              hugs: 0,
+              isLiked: false
+          }, ...prev]);
+
+          // Case 2 Trigger: Auto-light "My Medicine" card immediately
+          // This starts the "Waterfall" flow.
+          // Because the user submitted, "my-new" is added.
+          // The line will now draw from "my-new" (Top) to any ALREADY liked cards (Bottom).
+          setVisitedCardIds(prev => new Set(prev).add(newId));
+
+          setHealingText("");
+      } else {
+          alert("抱抱你。试着多描述一下那个治愈你的具体画面吧，比如热茶、夕阳...");
+      }
+      setIsSubmittingMedicine(false);
+  };
+
+  const handleHug = (id: string) => {
+      // 1. Update visual count and state
+      setEchoes(prev => prev.map(e => {
+          if (e.id === id) {
+              return { 
+                  ...e, 
+                  isLiked: true,
+                  hugs: (e.hugs || 0) + 1 
+              };
+          }
+          return e;
+      }));
+
+      // 2. Case 1 Trigger: Clicking 'Hug' manually lights up the card
+      // This works BOTH before and after submission.
+      setVisitedCardIds(prev => {
+          const next = new Set(prev);
+          next.add(id);
+          return next;
+      });
+  };
+
   const toggleAudio = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent toggling tuner
+    e.stopPropagation();
     setIsPlaying((prev) => !prev);
     if (!isPlaying && volume < 0.1) setVolume(1);
   };
 
   const handleDashboardScenarioClick = (id: string) => {
     if (id === 'relax') {
-        // Reset states for a fresh session
         setVolume(1);
         setIsPlaying(false);
         setTreeholeStep(0);
         setSelectedMood("");
         setSelectedContext("");
-        setUserText("");
+        setHealingText("");
+        setMyMedicine(null);
         setAiResult(null);
         setActiveAmbianceId('default');
-        // Reset fragrance to default or keep current? Let's keep current.
         setCurrentAudioUrl(DEFAULT_AUDIO_URL);
         
-        // Reset Ritual Transition States
+        // Reset Waterfall State
+        setVisitedCardIds(new Set()); 
+        setPathPoints([]);
+        
         setShowRitualLayer(true);
         setFadeRitual(false);
         
-        // Navigate to Ritual
         setPhase(AppPhase.RITUAL);
     }
   };
@@ -226,14 +320,12 @@ const App: React.FC = () => {
       const mode = AMBIANCE_MODES.find(m => m.id === modeId);
       if (mode) {
           setActiveAmbianceId(modeId);
-          // Only change if different to avoid reload
           if (currentAudioUrl !== mode.audioUrl) {
               setCurrentAudioUrl(mode.audioUrl);
           }
       }
   };
 
-  // Derive current theme from active ambiance
   const currentTheme = AMBIANCE_MODES.find(m => m.id === activeAmbianceId)?.theme || 'warm';
 
   // --- RENDERERS ---
@@ -241,7 +333,7 @@ const App: React.FC = () => {
   const renderImmersion = () => (
     <div 
         className="absolute inset-0 z-30 overflow-y-auto no-scrollbar animate-fade-in flex flex-col font-sans cursor-pointer"
-        onClick={() => {}} // Cleaned up toggle
+        onClick={() => {}} 
     >
       {isAudioLoading && isPlaying && !audioError && volume > 0 && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/30 backdrop-blur-md pointer-events-none animate-fade-in">
@@ -251,7 +343,6 @@ const App: React.FC = () => {
       )}
 
       {/* Main Poem Area */}
-      {/* Revised Padding: pt-32 (enough clearance from top controls/heart) and pb-48 (clearance from bottom ambiance tuner) */}
       <div className="flex-grow flex flex-col justify-center items-center relative p-8 pt-32 pb-48 min-h-[85vh]">
         <div className="max-w-md w-full text-center flex flex-col items-center mix-blend-multiply">
           {(TEXT_CONTENT.immersion as string[]).map((line, idx) => {
@@ -304,199 +395,285 @@ const App: React.FC = () => {
     return (
       <div className="fixed inset-0 z-50 bg-black/5 backdrop-blur-sm flex flex-col items-center justify-center p-0 animate-fade-in font-sans">
           
-          {/* Main Card Container - Full Screen/Modal Hybrid */}
-          {/* REMOVED: max-w-sm, height restrictions */}
+          {/* Main Card Container */}
           <div className={`w-full h-full md:h-auto md:max-w-md md:rounded-[3rem] bg-[#F5F5F7]/95 backdrop-blur-2xl transition-all duration-500 overflow-hidden flex flex-col relative ${aiResult ? '' : 'justify-center'}`}>
               
-              {/* Soft Color Splash Top - Aesthetic Background */}
+              {/* Soft Color Splash */}
               <div className="absolute top-[-100px] right-[-50px] w-64 h-64 bg-dopamine-orange/20 rounded-full blur-[80px] pointer-events-none mix-blend-multiply" />
               <div className="absolute bottom-[-100px] left-[-50px] w-64 h-64 bg-dopamine-blue/20 rounded-full blur-[80px] pointer-events-none mix-blend-multiply" />
-              <div className="absolute top-[40%] left-[50%] transform -translate-x-1/2 w-80 h-80 bg-white/40 rounded-full blur-[100px] pointer-events-none" />
-
-              {/* Progress Bar (Only during input phases) */}
-              {!aiResult && (
+              
+              {/* Progress Bar (Only during selection) */}
+              {!aiResult && !isGenerating && (
                   <div className="absolute top-12 left-0 right-0 flex justify-center space-x-2 z-10">
-                      {[0, 1, 2].map(step => (
+                      {[0, 1].map(step => (
                           <div key={step} className={`h-1 rounded-full transition-all duration-500 ease-spring ${treeholeStep >= step ? 'w-8 bg-dopamine-orange' : 'w-2 bg-gray-300/50'}`} />
                       ))}
                   </div>
               )}
 
               {/* Content Area */}
-              <div className={`flex-1 flex flex-col relative z-20 overflow-y-auto no-scrollbar ${aiResult ? 'pt-10 px-6 pb-32' : 'px-8 pb-8 justify-center'}`}>
+              <div className={`flex-1 flex flex-col relative z-20 ${aiResult ? 'h-full overflow-hidden' : 'px-8 pb-8 pt-28 overflow-y-auto no-scrollbar'}`}>
                   
-                  {/* Step 0: Mood Selection */}
-                  {treeholeStep === 0 && (
-                      <div className="animate-fade-in flex flex-col items-center">
-                          {/* Back Button specifically for Manual Entry from Immersion */}
-                          {isPlaying && (
-                            <button onClick={handleBackToImmersion} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
-                                <ArrowLeft className="w-5 h-5" />
-                            </button>
-                          )}
-
-                          <h3 className="text-center font-bold text-ink-gray text-3xl mb-3 mt-10">此刻心情</h3>
-                          <p className="text-center text-ink-light text-sm mb-12 font-medium bg-white/60 px-5 py-2 rounded-full backdrop-blur-sm shadow-sm border border-white/40">把心事交给小屿，没关系的</p>
-                          
-                          <div className="grid grid-cols-2 gap-5 w-full">
-                              {MOOD_OPTIONS.map((mood) => (
-                                  <button
-                                      key={mood.id}
-                                      onClick={() => handleMoodSelect(mood.label)}
-                                      className={`
-                                        group relative p-6 rounded-[2rem] flex flex-col items-center justify-center space-y-3 transition-all duration-300 transform active:scale-95 border
-                                        ${selectedMood === mood.label ? mood.style + ' shadow-xl scale-[1.02] border-white' : 'bg-white/70 text-gray-400 border-white/40 hover:bg-white hover:shadow-lg hover:shadow-gray-100/50'}
-                                      `}
-                                  >
-                                      <span className="text-5xl transition-transform duration-300 group-hover:-translate-y-2 drop-shadow-sm filter grayscale-[0.2] group-hover:grayscale-0">{mood.icon}</span>
-                                      <span className="text-base font-bold tracking-wide">{mood.label}</span>
-                                  </button>
-                              ))}
-                          </div>
+                  {isGenerating ? (
+                      <div className="flex flex-col items-center justify-center h-full space-y-4">
+                          <Loader2 className="w-10 h-10 text-dopamine-orange animate-spin" />
+                          <p className="text-ink-light text-sm tracking-widest animate-pulse">小屿正在写信...</p>
                       </div>
-                  )}
+                  ) : aiResult ? (
+                    // --- RESULT PAGE: Echo Waterfall & Healing Medicine ---
+                       <div className="h-full relative animate-fade-in">
+                            
+                            {/* Scroll Container with Ref for Waterfall Effect */}
+                            <div 
+                                ref={scrollContainerRef}
+                                className="absolute inset-0 overflow-y-auto no-scrollbar pb-32 scroll-smooth"
+                            >
+                                {/* SVG Overlay for Constellation Lines */}
+                                <svg 
+                                    className="absolute top-0 left-0 w-full h-full pointer-events-none z-0 overflow-visible"
+                                >
+                                    <defs>
+                                        <filter id="glow">
+                                            <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur"/>
+                                                <feMergeNode in="SourceGraphic"/>
+                                            </feMerge>
+                                        </filter>
+                                    </defs>
+                                    <polyline 
+                                        points={pathPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                                        fill="none"
+                                        stroke="#F59E0B" // Amber-500 Warm Yellow
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeOpacity="0.5"
+                                        filter="url(#glow)"
+                                        className="animate-pulse"
+                                    />
+                                </svg>
+                                
+                                {/* 1. AI Reply Section */}
+                                <div className="px-6 pt-10 pb-6 relative z-10">
+                                    <div className="flex items-center gap-2 mb-6 opacity-60">
+                                        <div className="w-2 h-2 rounded-full bg-dopamine-green animate-pulse" />
+                                        <span className="text-xs font-bold text-ink-gray tracking-wide">
+                                            此刻，还有 {residentCount} 位邻居在山中
+                                        </span>
+                                    </div>
 
-                  {/* Step 1: Context Selection */}
-                  {treeholeStep === 1 && (
-                      <div className="animate-fade-in flex flex-col items-center">
-                           <button onClick={() => setTreeholeStep(0)} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
-                                <ArrowLeft className="w-5 h-5" />
-                           </button>
-
-                           <h3 className="text-center font-bold text-ink-gray text-3xl mb-3 mt-10">因为什么呢？</h3>
-                           <p className="text-center text-ink-light text-sm mb-10 font-medium">找到源头，才能更好的抱抱你</p>
-                           
-                           {/* Social Proof Badge */}
-                           <div className="flex items-center space-x-2 mb-10 bg-white/80 backdrop-blur-sm py-2 px-4 rounded-full shadow-sm border border-white/60">
-                                <div className="flex -space-x-1.5">
-                                    {[1,2,3].map(i => <div key={i} className="w-5 h-5 rounded-full bg-gray-200 border-2 border-white" />)}
-                                </div>
-                                <span className="text-xs font-bold text-ink-light">
-                                    {Math.floor(residentCount / 3)} 人此刻与你共鸣
-                                </span>
-                           </div>
-
-                           <div className="flex flex-wrap justify-center gap-3 w-full">
-                               {CONTEXT_OPTIONS.map((ctx) => (
-                                   <button
-                                       key={ctx}
-                                       onClick={() => handleContextSelect(ctx)}
-                                       className={`px-6 py-4 rounded-2xl text-sm font-bold border transition-all duration-300 hover:-translate-y-1 active:scale-95 ${selectedContext === ctx ? 'bg-ink-gray text-white border-ink-gray shadow-xl shadow-gray-200' : 'border-white/50 text-ink-light bg-white/70 hover:bg-white hover:shadow-md'}`}
-                                   >
-                                       {ctx}
-                                   </button>
-                               ))}
-                           </div>
-                      </div>
-                  )}
-
-                  {/* Step 2: Text Input & Result */}
-                  {treeholeStep === 2 && (
-                      <div className="animate-fade-in h-full flex flex-col">
-                          {aiResult ? (
-                               <div className="flex flex-col items-center w-full space-y-6 animate-fade-in">
-                                    
-                                    {/* 1. Letter Card (Warm, Paper-like) */}
-                                    <div className="w-full bg-[#FFF9F0] p-8 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(255,160,0,0.15)] relative border border-[#F2E8D5] flex flex-col gap-4">
-                                        <div className="flex items-center gap-3 mb-2 opacity-80">
+                                    {/* AI Letter Card */}
+                                    <div className="w-full bg-[#FFF9F0] p-8 rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(255,160,0,0.1)] border border-[#F2E8D5] relative mb-8">
+                                        <div className="flex items-center gap-3 mb-4 opacity-80">
                                             <div className="w-8 h-8 rounded-full bg-dopamine-orange/20 flex items-center justify-center text-dopamine-orange">
                                                 <MessageCircleHeart className="w-4 h-4" />
                                             </div>
                                             <span className="font-bold text-ink-gray text-sm tracking-wide">小屿的回信</span>
                                         </div>
-                                        
                                         <p className="font-serif text-ink-gray text-[17px] leading-8 text-justify opacity-90">
                                             {aiResult.reply}
                                         </p>
-
-                                        {/* Decorative Stamp/Signature */}
-                                        <div className="self-end mt-2 flex items-center gap-2 opacity-60">
+                                        <div className="self-end mt-4 flex items-center justify-end gap-2 opacity-60">
                                             <span className="font-serif text-xs italic text-ink-light">Yours, Xiaoyu</span>
                                             <Leaf className="w-4 h-4 text-dopamine-green" />
                                         </div>
                                     </div>
-                                    
-                                    {/* 2. Echo Card (Modern, Glassy, Realistic) */}
-                                    <div className="w-full relative pl-4 mt-2">
-                                        {/* Vertical line connector */}
-                                        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-dopamine-blue/30 to-transparent"></div>
-                                        
-                                        <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 rounded-[2rem] shadow-sm hover:shadow-md transition-shadow">
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Sparkles className="w-4 h-4 text-dopamine-blue" />
-                                                    <h4 className="font-bold text-ink-gray text-sm">远方的回响</h4>
+
+                                    {/* 2. Share Invitation Card */}
+                                    {!myMedicine ? (
+                                        <div className="w-full bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border border-white/60 shadow-sm relative overflow-hidden transition-all">
+                                            <div className="flex items-start gap-3 mb-4">
+                                                <div className="p-2 bg-dopamine-green/10 rounded-full text-dopamine-green">
+                                                    <Feather className="w-5 h-5" />
                                                 </div>
-                                                <span className="text-[10px] font-bold text-dopamine-blue bg-dopamine-blue/10 px-2 py-1 rounded-md">
-                                                    @{aiResult.nickname}
-                                                </span>
+                                                <div>
+                                                    <h4 className="font-bold text-ink-gray text-base">什么小事治愈过你？</h4>
+                                                    <p className="text-xs text-ink-light mt-1">
+                                                        便利店的热关东煮、路边的猫...<br/>
+                                                        留下你的“药方”，治愈远方的人。
+                                                    </p>
+                                                </div>
                                             </div>
                                             
-                                            <p className="text-sm text-ink-gray leading-7 text-justify font-normal opacity-80">
-                                                "{aiResult.story}"
-                                            </p>
-
-                                            {/* Reaction Bar (Mock) */}
-                                            <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100/50">
-                                                <div className="flex items-center gap-1 opacity-40 text-xs font-bold">
-                                                    <Heart className="w-3 h-3" /> 124
-                                                </div>
-                                                <div className="flex items-center gap-1 opacity-40 text-xs font-bold">
-                                                    <span className="text-[10px]">🫂</span> 抱抱
-                                                </div>
+                                            <textarea 
+                                                value={healingText}
+                                                onChange={(e) => setHealingText(e.target.value)}
+                                                placeholder="写下那个瞬间..."
+                                                className="w-full bg-white/50 rounded-xl p-4 text-sm text-ink-gray placeholder:text-gray-300 focus:outline-none focus:bg-white focus:ring-1 focus:ring-dopamine-green/30 resize-none h-24 mb-4 transition-colors"
+                                            />
+                                            
+                                            <div className="flex justify-end">
+                                                <button 
+                                                    onClick={handleMedicineSubmit}
+                                                    disabled={isSubmittingMedicine || !healingText.trim()}
+                                                    className="bg-ink-gray text-white px-5 py-2.5 rounded-full text-xs font-bold flex items-center gap-2 hover:bg-black transition-colors disabled:opacity-50"
+                                                >
+                                                    {isSubmittingMedicine ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                                                    分享给远方的人
+                                                </button>
                                             </div>
+                                        </div>
+                                    ) : (
+                                        <div className="hidden" /> 
+                                    )}
+                                </div>
+
+                                {/* 3. Echo Waterfall */}
+                                <div className="px-4 relative z-10">
+                                    <div className="flex items-center justify-between mb-6 px-2">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4 text-dopamine-blue" />
+                                            {/* Dynamic Mood Title */}
+                                            <h4 className="font-bold text-ink-gray text-lg">远方的回响 · {selectedMood || "共鸣"}</h4>
                                         </div>
                                     </div>
 
-                                    <div className="h-8"></div> {/* Spacer */}
-                                    
-                                    {/* Action Button */}
-                                    <button 
-                                        onClick={() => setPhase(AppPhase.DASHBOARD)}
-                                        className="w-full bg-ink-gray text-white py-4 rounded-[1.5rem] font-bold text-lg flex items-center justify-center space-x-2 hover:bg-black transition-all shadow-xl shadow-gray-200 hover:scale-[1.02] active:scale-95 group"
-                                    >
-                                        <span>带着能量出发</span>
-                                        <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                    </button>
-                               </div>
-                          ) : (
-                              <div className="flex flex-col items-center justify-center min-h-[50vh]">
-                                  <button onClick={() => setTreeholeStep(1)} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
-                                        <ArrowLeft className="w-5 h-5" />
-                                  </button>
-                                  
-                                  {/* FIXED: Overlapping UI. Changed to flex-wrap with gap. */}
-                                  <div className="flex flex-wrap items-center justify-center gap-3 mb-8 mt-10 w-full max-w-[80%]">
-                                      <span className="text-xs font-bold bg-white text-ink-gray px-4 py-1.5 rounded-full border border-gray-100 shadow-sm whitespace-nowrap">{selectedMood}</span>
-                                      <span className="text-xs text-gray-300">+</span>
-                                      <span className="text-xs font-bold bg-white text-ink-gray px-4 py-1.5 rounded-full border border-gray-100 shadow-sm whitespace-nowrap">{selectedContext}</span>
-                                  </div>
-                                  
-                                  <h3 className="text-center font-bold text-ink-gray text-2xl mb-3">还有想说的吗？</h3>
-                                  <p className="text-center text-xs text-ink-light mb-8">（悄悄告诉小屿，风会带走烦恼）</p>
-                                  
-                                  <div className="w-full relative">
-                                      <textarea
-                                        value={userText}
-                                        onChange={(e) => setUserText(e.target.value)}
-                                        placeholder="可以不写哦，小屿懂你的..."
-                                        className="w-full bg-white border-0 focus:ring-2 focus:ring-dopamine-orange/20 rounded-[2rem] p-8 text-ink-gray focus:outline-none text-center resize-none h-48 placeholder:text-ink-light/30 placeholder:font-medium transition-all shadow-sm text-lg leading-relaxed"
-                                      />
-                                      {/* Character count or decoration could go here */}
-                                  </div>
+                                    <div className="columns-2 gap-4 space-y-4">
+                                        {echoes.map((echo) => {
+                                            const isActive = visitedCardIds.has(echo.id);
+                                            
+                                            return (
+                                                <div 
+                                                    key={echo.id}
+                                                    ref={el => { if (el) cardRefs.current.set(echo.id, el); }}
+                                                    className={`break-inside-avoid mb-4 p-5 rounded-[1.5rem] transition-all duration-700 ease-out relative
+                                                        ${isActive 
+                                                            // Warm Amber/Yellow Theme for Active State
+                                                            ? 'bg-[#FFFBEB] shadow-[0_4px_20px_-4px_rgba(251,191,36,0.5)] scale-100 z-20 border-[#FCD34D] opacity-100 ring-2 ring-[#FCD34D]/50' 
+                                                            : 'bg-white/80 shadow-sm border-[#F0EBE3] opacity-60 scale-95 grayscale-[0.3]'
+                                                        }
+                                                        border
+                                                    `}
+                                                >
+                                                    
+                                                    {/* Special styling for My Own Medicine */}
+                                                    {echo.id === 'my-new' && (
+                                                        <div className="absolute -top-2 -right-2 bg-dopamine-green text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm z-30">
+                                                            我
+                                                        </div>
+                                                    )}
 
-                                  <div className="flex justify-center mt-10">
-                                      <button 
-                                        onClick={handleFinalSubmit}
-                                        disabled={isGenerating}
-                                        className="w-20 h-20 rounded-full bg-ink-gray text-white flex items-center justify-center hover:shadow-xl hover:shadow-gray-300 transition-all disabled:opacity-80 shadow-lg hover:scale-110 active:scale-90 group"
+                                                    <p className="text-sm text-[#5E5A55] leading-6 text-justify mb-4 font-normal font-serif">
+                                                        {echo.content}
+                                                    </p>
+                                                    
+                                                    {/* Footer: Nickname + Heart Icon */}
+                                                    <div className="flex items-center justify-between pt-3 border-t border-gray-50/50">
+                                                        <span className="text-[10px] text-[#9CA3AF] font-serif truncate max-w-[80px]">
+                                                            @{echo.nickname}
+                                                        </span>
+                                                        
+                                                        <button 
+                                                            onClick={() => handleHug(echo.id)}
+                                                            className="flex items-center gap-1 group relative z-30" // z-30 to ensure clickable
+                                                        >
+                                                            <div className={`
+                                                                p-1.5 rounded-full transition-all duration-300
+                                                                ${echo.isLiked ? 'bg-dopamine-pink/10 text-dopamine-pink' : 'text-gray-300 group-hover:text-dopamine-pink'}
+                                                            `}>
+                                                                <Heart className={`w-3.5 h-3.5 ${echo.isLiked ? 'fill-current' : ''}`} />
+                                                            </div>
+                                                            <span className={`text-[10px] tabular-nums transition-colors ${echo.isLiked ? 'text-dopamine-pink font-bold' : 'text-gray-300'}`}>
+                                                                {echo.hugs || 0}
+                                                            </span>
+                                                            
+                                                            {/* INVISIBLE CONNECTION ANCHOR - Inside the button for perfect alignment */}
+                                                            {/* This solves the visual offset issue caused by glassmorphism cards */}
+                                                            <div 
+                                                                ref={el => { if (el) dotRefs.current.set(echo.id, el); }}
+                                                                className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0" 
+                                                            />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    
+                                    <div className="py-12 text-center opacity-30">
+                                        <Leaf className="w-6 h-6 mx-auto mb-2 text-ink-light" />
+                                        <p className="text-[10px] text-ink-light tracking-widest">THE END</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 4. Fixed Bottom Action Button */}
+                            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#F5F5F7] via-[#F5F5F7]/95 to-transparent z-40 flex justify-center pointer-events-none">
+                                <button 
+                                    onClick={() => setPhase(AppPhase.DASHBOARD)}
+                                    className="pointer-events-auto w-full max-w-sm bg-ink-gray text-white py-4 rounded-[2rem] font-bold text-lg flex items-center justify-center space-x-2 hover:bg-black transition-all shadow-2xl shadow-gray-300 hover:scale-[1.02] active:scale-95 group"
+                                >
+                                    <span>带着能量出发</span>
+                                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                </button>
+                            </div>
+                       </div>
+                  ) : (
+                      // --- SELECTION PHASE ---
+                      // Step 0: Mood -> Step 1: Context (Auto Trigger)
+                      <>
+                      {treeholeStep === 0 && (
+                          <div className="animate-fade-in flex flex-col items-center">
+                              {isPlaying && (
+                                <button onClick={handleManualMoodEntry} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
+                                    <ArrowLeft className="w-5 h-5" />
+                                </button>
+                              )}
+
+                              <h3 className="text-center font-bold text-ink-gray text-3xl mb-3 mt-2">此刻心情</h3>
+                              <p className="text-center text-ink-light text-sm mb-12 font-medium bg-white/60 px-5 py-2 rounded-full backdrop-blur-sm shadow-sm border border-white/40">把心事交给小屿，没关系的</p>
+                              
+                              <div className="grid grid-cols-2 gap-5 w-full">
+                                  {MOOD_OPTIONS.map((mood) => (
+                                      <button
+                                          key={mood.id}
+                                          onClick={() => handleMoodSelect(mood.label)}
+                                          className={`
+                                            group relative p-6 rounded-[2rem] flex flex-col items-center justify-center space-y-3 transition-all duration-300 transform active:scale-95 border
+                                            ${selectedMood === mood.label ? mood.style + ' shadow-xl scale-[1.02] border-white' : 'bg-white/70 text-gray-400 border-white/40 hover:bg-white hover:shadow-lg hover:shadow-gray-100/50'}
+                                          `}
                                       >
-                                          {isGenerating ? <Loader2 className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8 ml-1 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
+                                          <span className="text-5xl transition-transform duration-300 group-hover:-translate-y-2 drop-shadow-sm filter grayscale-[0.2] group-hover:grayscale-0">{mood.icon}</span>
+                                          <span className="text-base font-bold tracking-wide">{mood.label}</span>
                                       </button>
-                                  </div>
+                                  ))}
                               </div>
-                          )}
-                      </div>
+                          </div>
+                      )}
+
+                      {treeholeStep === 1 && (
+                          <div className="animate-fade-in flex flex-col items-center">
+                               <button onClick={() => setTreeholeStep(0)} className="absolute top-10 left-6 p-2 text-ink-light hover:text-ink-gray transition-colors bg-white/50 rounded-full shadow-sm">
+                                    <ArrowLeft className="w-5 h-5" />
+                               </button>
+
+                               <h3 className="text-center font-bold text-ink-gray text-3xl mb-3 mt-2">因为什么呢？</h3>
+                               <p className="text-center text-ink-light text-sm mb-10 font-medium">找到源头，才能更好的抱抱你</p>
+                               
+                               <div className="flex items-center space-x-2 mb-10 bg-white/80 backdrop-blur-sm py-2 px-4 rounded-full shadow-sm border border-white/60">
+                                    <div className="flex -space-x-1.5">
+                                        {[1,2,3].map(i => <div key={i} className="w-5 h-5 rounded-full bg-gray-200 border-2 border-white" />)}
+                                    </div>
+                                    <span className="text-xs font-bold text-ink-light">
+                                        {Math.floor(residentCount / 3)} 人此刻与你共鸣
+                                    </span>
+                               </div>
+
+                               <div className="flex flex-wrap justify-center gap-3 w-full">
+                                   {CONTEXT_OPTIONS.map((ctx) => (
+                                       <button
+                                           key={ctx}
+                                           onClick={() => handleContextSelect(ctx)}
+                                           className={`px-6 py-4 rounded-2xl text-sm font-bold border transition-all duration-300 hover:-translate-y-1 active:scale-95 ${selectedContext === ctx ? 'bg-ink-gray text-white border-ink-gray shadow-xl shadow-gray-200' : 'border-white/50 text-ink-light bg-white/70 hover:bg-white hover:shadow-md'}`}
+                                       >
+                                           {ctx}
+                                       </button>
+                                   ))}
+                               </div>
+                          </div>
+                      )}
+                      </>
                   )}
               </div>
           </div>
@@ -547,20 +724,8 @@ const App: React.FC = () => {
           Main Content Switcher 
       */}
 
-      {/* 
-          LAYER 1: IMMERSION (The Destination)
-          Rendered when phase is IMMERSION.
-          Sits at z-30.
-          Initially hidden by Ritual Layer (z-50).
-      */}
       {phase === AppPhase.IMMERSION && renderImmersion()}
 
-      {/* 
-          LAYER 2: RITUAL (The Entry & Transition Overlay)
-          Rendered if phase is LANDING/RITUAL OR if showRitualLayer is true (during transition).
-          Sits at z-50 (on top).
-          Fades out using CSS opacity when fadeRitual is true.
-      */}
       {showRitualLayer && (
           <div className={`absolute inset-0 z-50 transition-opacity duration-[3000ms] ease-in-out ${fadeRitual ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
               <Ritual 
@@ -572,7 +737,6 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* Other Phases */}
       {phase === AppPhase.TREEHOLE && renderTreehole()}
       {phase === AppPhase.DASHBOARD && <Dashboard onScenarioClick={handleDashboardScenarioClick} />}
     </div>
